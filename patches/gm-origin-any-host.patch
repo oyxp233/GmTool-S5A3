@@ -1,0 +1,52 @@
+diff --git a/gateway/internal/services/gmtool/external.go b/gateway/internal/services/gmtool/external.go
+index b73e9c2..58f3dde 100644
+--- a/gateway/internal/services/gmtool/external.go
++++ b/gateway/internal/services/gmtool/external.go
+@@ -7,6 +7,7 @@ import (
+ 	"errors"
+ 	"io"
+ 	"net/http"
++	"net/url"
+ 	"strings"
+ 	"sync"
+ 	"time"
+@@ -23,6 +24,23 @@ func localGMRoute(path string) bool {
+ 	return staticCatalogRoute(path) || path == "/api/v1/settings/pvf"
+ }
+ 
++// originSameHost reports whether origin points at exactly the host serving the
++// request (scheme may differ, port must match). The GM console is published
++// behind a reverse proxy on an arbitrary host/port, so pinning publicOrigin to a
++// single literal value breaks every other entry point; comparing against the
++// live Host keeps the CSRF guard (cross-site origins still fail) while allowing
++// any domain or port to be used without touching service.json.
++func originSameHost(origin, host string) bool {
++	u, err := url.Parse(origin)
++	if err != nil || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" {
++		return false
++	}
++	if u.Scheme != "https" && u.Scheme != "http" {
++		return false
++	}
++	return u.Host != "" && u.Host == host
++}
++
+ // GatewayHandler is mounted only on the private management listener. Browser
+ // credentials and legacy routes are absent in this deployment mode.
+ func (s *Server) GatewayHandler(token, hash string) http.Handler {
+@@ -104,12 +122,13 @@ func (s *Server) ExternalHandler(webRoot, publicOrigin string, peer *servicehttp
+ 		w.Header().Set("X-Content-Type-Options", "nosniff")
+ 		w.Header().Set("Referrer-Policy", "no-referrer")
+ 		// This listener is loopback-only behind the configured HTTPS origin.
++		origin := r.Header.Get("Origin")
+ 		if publicOrigin != "" {
+-			if origin := r.Header.Get("Origin"); origin != "" && origin != publicOrigin {
++			if origin != "" && origin != publicOrigin && !originSameHost(origin, r.Host) {
+ 				http.Error(w, "来源验证失败", 403)
+ 				return
+ 			}
+-			if strings.HasPrefix(publicOrigin, "https://") {
++			if strings.HasPrefix(publicOrigin, "https://") || strings.HasPrefix(origin, "https://") {
+ 				r = r.Clone(r.Context())
+ 				r.TLS = &tls.ConnectionState{}
+ 			}

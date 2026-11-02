@@ -1,0 +1,98 @@
+.hot-update-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.hot-update-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-radius: 14px;
+}
+.hot-update-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.hot-update-title strong {
+  display: block;
+  font-size: 15px;
+}
+.hot-update-title span {
+  display: block;
+  font-size: 12px;
+  opacity: 0.72;
+  margin-top: 2px;
+}
+.hot-update-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hot-update-toolbar .search {
+  width: 280px;
+}
+.hot-update-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+}
+.hot-update-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 14px;
+}
+.hot-update-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.hot-update-card h3 {
+  font-size: 14px;
+  margin: 0;
+}
+.hot-update-card p {
+  margin: 0;
+  font-size: 12px;
+}
+.hot-update-card .table-scroll {
+  max-height: 220px;
+}
+.hot-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+}
+.hot-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-3);
+  flex: 1 1 90px;
+}
+.hot-form label.wide {
+  flex: 1 1 100%;
+}
+.hot-form input,
+.hot-form select,
+.hot-form textarea {
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: color-mix(in srgb, var(--surface-input) 70%, transparent);
+  color: var(--text-1);
+  font-size: 12px;
+}
+.hot-form textarea {
+  font-family: var(--font-mono, monospace);
+  resize: vertical;
+}
+.hot-form button {
+  flex: 0 0 auto;
+}
