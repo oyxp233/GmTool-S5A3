@@ -56,6 +56,8 @@ type MagicBoxRewardGroupJSON struct {
 	ItemID int64 `json:"itemId"`
 	Weight int64 `json:"weight"`
 	Count  int64 `json:"count"`
+	// Group 相同的条目组成一组，每次开盒每组按权重抽一条；省略即全部在第 0 组。
+	Group int `json:"group,omitempty"`
 }
 
 type Response struct {

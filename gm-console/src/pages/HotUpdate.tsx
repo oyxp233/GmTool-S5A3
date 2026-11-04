@@ -8,8 +8,50 @@ type HotUpdateData = {
   sell?: Record<string, number>;
   upgrade?: Record<string, number>;
   epicRate?: Record<string, number>;
-  magicBox?: Record<string, { itemId: number; weight: number; count: number }[]>;
+  magicBox?: Record<
+    string,
+    { itemId: number; weight: number; count: number; group?: number }[]
+  >;
 };
+
+// 服务端成功率按十万分比计（100000 = 100%）。
+const UPGRADE_SUCCESS_BASE = 100000;
+const UPGRADE_MODE_LABEL: Record<string, string> = {
+  reinforce: "强化",
+  amplify: "增幅",
+  强化: "强化",
+  增幅: "增幅",
+};
+
+function percent(value: number, base: number) {
+  const pct = (value / base) * 100;
+  return `${Number.isInteger(pct) ? pct : pct.toFixed(2)}%`;
+}
+
+// 魔盒条目按组展示：同组按权重抽一条，显示组内占比。
+function describeMagicBox(
+  entries: { itemId: number; weight: number; count: number; group?: number }[],
+) {
+  const groups = new Map<number, typeof entries>();
+  for (const entry of entries) {
+    const key = entry.group ?? 0;
+    groups.set(key, [...(groups.get(key) || []), entry]);
+  }
+  const multi = groups.size > 1;
+  return [...groups.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([group, list]) => {
+      const total = list.reduce((sum, e) => sum + Math.max(0, e.weight), 0);
+      const items = list
+        .map(
+          (e) =>
+            `#${e.itemId}×${e.count}（${total > 0 ? percent(Math.max(0, e.weight), total) : "0%"}）`,
+        )
+        .join("、");
+      return multi ? `第${group}组抽一：${items}` : `抽一：${items}`;
+    })
+    .join("；");
+}
 
 export function HotUpdatePage({ state, notify }: PageProps) {
   const live = useLive();
@@ -31,7 +73,7 @@ export function HotUpdatePage({ state, notify }: PageProps) {
   const [sellItem, setSellItem] = useState("");
   const [sellGold, setSellGold] = useState("");
   // ── 强化/增幅 ──
-  const [upgradeMode, setUpgradeMode] = useState("强化");
+  const [upgradeMode, setUpgradeMode] = useState("reinforce");
   const [upgradeLevel, setUpgradeLevel] = useState("");
   const [upgradeWeight, setUpgradeWeight] = useState("");
   // ── 史诗掉率 ──
@@ -60,6 +102,8 @@ export function HotUpdatePage({ state, notify }: PageProps) {
   async function run(action: () => Promise<unknown> | undefined, success: string) {
     try {
       await action();
+      // 写入接口只回条数，重新拉一次列表让表格显示最新覆盖。
+      await live?.hotUpdate();
       notify(success);
     } catch (e) {
       notify((e as Error).message);
@@ -209,7 +253,9 @@ export function HotUpdatePage({ state, notify }: PageProps) {
             <h3>强化 / 增幅成功率</h3>
             <Pill tone="purple">upgrade_success_override</Pill>
           </header>
-          <p className="muted">覆盖指定等级的成功率（万分比）。</p>
+          <p className="muted">
+            覆盖指定目标等级的成功率，按十万分比填写：10000 = 10%，100000 = 100%。
+          </p>
           <div className="hot-form">
             <label>
               模式
@@ -217,8 +263,8 @@ export function HotUpdatePage({ state, notify }: PageProps) {
                 value={upgradeMode}
                 onChange={(e) => setUpgradeMode(e.target.value)}
               >
-                <option value="强化">强化</option>
-                <option value="增幅">增幅</option>
+                <option value="reinforce">强化</option>
+                <option value="amplify">增幅</option>
               </select>
             </label>
             <label>
@@ -231,11 +277,11 @@ export function HotUpdatePage({ state, notify }: PageProps) {
               />
             </label>
             <label>
-              成功率（万分比）
+              成功率（十万分比）
               <input
                 value={upgradeWeight}
                 onChange={(e) => setUpgradeWeight(e.target.value)}
-                placeholder="例如 1000 = 10%"
+                placeholder="例如 10000 = 10%"
                 inputMode="numeric"
               />
             </label>
@@ -290,9 +336,12 @@ export function HotUpdatePage({ state, notify }: PageProps) {
               <tbody>
                 {upgradeRows.map((row) => (
                   <tr key={`${row.mode}:${row.level}`}>
-                    <td>{row.mode}</td>
+                    <td>{UPGRADE_MODE_LABEL[row.mode] || row.mode}</td>
                     <td>+{row.level}</td>
-                    <td>{Number(row.weight).toLocaleString()} / 10000</td>
+                    <td>
+                      {Number(row.weight).toLocaleString()} / {UPGRADE_SUCCESS_BASE.toLocaleString()}（
+                      {percent(Number(row.weight), UPGRADE_SUCCESS_BASE)}）
+                    </td>
                     <td>
                       <button
                         className="text-button"
@@ -329,7 +378,9 @@ export function HotUpdatePage({ state, notify }: PageProps) {
             <h3>角色史诗掉率</h3>
             <Pill tone="purple">epic_rate_override</Pill>
           </header>
-          <p className="muted">按角色覆盖史诗掉率倍率，1.0 = 原倍率。</p>
+          <p className="muted">
+            按角色覆盖史诗掉率倍率，1.0 = 原倍率。只影响时空裂缝 / 裂缝入口的领主死亡奖励，普通副本和深渊派对不受影响。
+          </p>
           <div className="hot-form">
             <label>
               角色 ID
@@ -434,7 +485,8 @@ export function HotUpdatePage({ state, notify }: PageProps) {
             <Pill tone="purple">magic_box_override</Pill>
           </header>
           <p className="muted">
-            按盒子整组替换奖励清单与权重（赛丽亚的幸运 = 2682272）。
+            按盒子整组替换奖励清单（赛丽亚的幸运 = 2682272）：每次开盒按权重从清单里抽一条。
+            需要每次同时抽几样时，给条目加 "group"（0~15），每组各抽一条。
           </p>
           <div className="hot-form">
             <label>
@@ -452,16 +504,24 @@ export function HotUpdatePage({ state, notify }: PageProps) {
                 rows={4}
                 value={boxGroups}
                 onChange={(e) => setBoxGroups(e.target.value)}
-                placeholder={'[{"itemId":2600014,"weight":60,"count":2}]'}
+                placeholder={
+                  '[{"itemId":2600014,"weight":60,"count":2},{"itemId":2600015,"weight":40,"count":1}]'
+                }
               />
             </label>
             <button
               className="primary"
               disabled={busy || !canWrite || !boxItem}
               onClick={() => {
-                let groups: { itemId: number; weight: number; count: number }[];
+                let groups: {
+                  itemId: number;
+                  weight: number;
+                  count: number;
+                  group?: number;
+                }[];
                 try {
                   groups = JSON.parse(boxGroups || "[]");
+                  if (!Array.isArray(groups)) throw new Error();
                 } catch {
                   notify("奖励组 JSON 格式无效");
                   return;
@@ -512,12 +572,7 @@ export function HotUpdatePage({ state, notify }: PageProps) {
                   <tr key={row.box}>
                     <td>{row.box}</td>
                     <td className="muted">
-                      {row.groups
-                        .map(
-                          (g) =>
-                            `#${g.itemId}×${g.count}（${g.weight}%）`,
-                        )
-                        .join("、")}
+                      {describeMagicBox(row.groups)}
                     </td>
                     <td>
                       <button

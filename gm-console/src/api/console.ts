@@ -934,7 +934,7 @@ export class ConsoleAPI {
   }
   async hotUpdateMagicBox(body: {
     boxItemId: number;
-    groups: { itemId: number; weight: number; count: number }[];
+    groups: { itemId: number; weight: number; count: number; group?: number }[];
     clear?: boolean;
   }) {
     const key = crypto.randomUUID();
