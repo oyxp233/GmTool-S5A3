@@ -48,7 +48,8 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
-          context: ./src
+          # GM 的 go.mod/go.sum 在 gm/ 子目录，构建上下文必须是它而不是仓库根
+          context: ./src/gm
           file: ./src/gm/Dockerfile
           push: true
           tags: |
